@@ -1,5 +1,15 @@
 module Calculator where
 
+-- epxression grammar 
+--                        
+-- expression  ::= <addsub_expr> | <muldiv_expr> | <term> 
+-- addsub_expr ::= <term2> + <expression> | <term2> - <expression>
+-- muldiv_expr ::= <term> * <term2> | <term> / <term2>
+-- term2       ::= <muldiv_expr> | <term>
+-- term        ::= -<term>  | (<expression>) | unary_func | binary_func | <number> | const
+-- unary_func  ::= (ln | exp | sin | cos | ...) (<expression>)
+-- binary_func ::= (pow| add | sub | mul | div | ...) (<expression>, <expression>)
+
 
 type ExprParser = String -> (Float, String, Bool)
 
