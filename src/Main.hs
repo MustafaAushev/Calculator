@@ -19,7 +19,7 @@ parseArgs y@(x:_)   = do
          
 calculating :: IO()
 calculating = do
-    putStrLn $ "Введите выражение для подсчёта"
+    putStrLn $ "Введите выражение для подсчёта без знака =, например: 2+2"
     str <- getLine
     putStr str
     putStr "="
