@@ -1,121 +1,128 @@
+
 module Calculator where
 
--- epxression grammar 
---                        
--- expression  ::= <addsub_expr> | <muldiv_expr> | <term> 
--- addsub_expr ::= <term2> + <expression> | <term2> - <expression>
--- muldiv_expr ::= <term> * <term2> | <term> / <term2>
--- term2       ::= <muldiv_expr> | <term>
--- term        ::= -<term>  | (<expression>) | unary_func | binary_func | <number> | const
--- unary_func  ::= (ln | exp | sin | cos | ...) (<expression>)
--- binary_func ::= (pow| add | sub | mul | div | ...) (<expression>, <expression>)
 
 
-type ExprParser = String -> (Float, String, Bool)
 
-unary_functions = [("ln",log), ("exp", exp), ("sin", sin), ("cos", cos), ("inc", (+) 1)]
-binary_functions= [("pow", (**)), ("add", (+)), ("sub",(-)), ("mul", (*)), ("div",(/))]
-constants      = [("pi", pi), ("e", exp 1)]
+calculator :: (Read a, Num a, Fractional a) => String -> a
+calculator expression = evaluate $ restructure $ parse $ clean expression
 
 
-calculator :: String -> Float
+
+data Operators = Plus
+               | Minus
+               | Times
+               | Over
+               deriving (Show, Eq)
+
+               
+data SyntacticalElement a = Operator Operators
+                          | Operand a
+                          | SubList [SyntacticalElement a]
+                          deriving (Show)
 
 
-find_table_element :: String -> [(String, a)] -> a -> (a, String, Bool)
+                          
+number = ['0'..'9']  ++ ['.']
+operator = ['+', '-', '*', '/']
+open_brackets  = ['(', '[']
+close_brackets = [')', ']']
+brackets = open_brackets ++ close_brackets
+allowed_chars = number ++ operator ++ brackets
 
-failParse s = (0, s, False)
-isSucceed (val, s, res) = res
-getVal (val, s, res) = val
-getEndStr (val, s, res) = s
+--remove illegal characters
+clean expression = filter (\c -> any (==c) allowed_chars) expression
 
-check_str :: String -> String -> (Bool, String)
-check_str [] s2 = (True, s2)
-check_str s1 [] = (False, [])
-check_str s1 s2 = if (head(s1) == head(s2) ) then check_str (tail s1) (tail s2)
-                        else (False, s2)
-                      
-infixr 4 >|
-(>|) :: ExprParser -> ExprParser -> ExprParser
-(p1 >| p2) s = if isSucceed (p1 s) then p1 s else p2 s
 
-------------------------------------------------------------
-calculator s = getVal (expr (filter (\x-> x /= ' ') s))
 
-------------------------------------------------------------
-expr s = (addsub_expr >| term2) s
-                
-------------------------------------------------------------
-number s = case readsPrec 10 s of
-                x:xs -> (fst x, snd x, True)
-                [] -> failParse s
+parse :: (Read a, Num a, Fractional a) => String -> [SyntacticalElement a]
+parse "" = []
+parse expression = element : (parse rest)
+                   where (element, rest) = get_next_element expression
 
-------------------------------------------------------------
-parentheses s@(x:xs) = if (x /= '(') then failParse s
-                       else case expr xs of
-                        (_, fs, False) -> failParse fs
-                        (val, xr:sr, True) -> if (xr == ')') then (val, sr, True) else error "parse error: incorent parentheses"
-                        (_, [], _) -> error "parse error: expression parsing failed"                                                
-                                
-------------------------------------------------------------
-minus_term s@(x:xs) = if (x == '-') then
-                        if isSucceed (term xs) then
-                            ((-1.0)*getVal(term xs), getEndStr(term xs), True)
-                        else error ("parse error: expression parsing failed " ++ getEndStr(term xs))
-                    else failParse s                           
-                                                               
-------------------------------------------------------------
-term [] = failParse []
-term s  = (minus_term >| parentheses >| unary_func >| binary_func >| number >| const_p) s
+
+-- Just get the first syntactical element from the expression.
+get_next_element :: (Read a, Num a, Fractional a) => String -> (SyntacticalElement a, String)
+get_next_element s@(first:_)
+    | is_open_bracket first  = (to_sublist content, rest_b)
+    | is_operator first      = (to_operator operator, rest_o)
+    | is_number first        = (to_number number, rest_n)
+    | is_close_bracket first = error "Unexpected closing bracket!"
+    | otherwise              = error $ "Invalid Expression: \"" ++ s ++ "\""
+    where (number,   rest_n) = span is_number s
+          (operator, rest_o) = span is_operator s
+          (content,  rest_b) = parse_bracket s
           
-------------------------------------------------------------
-term2 s = if isSucceed (muldiv_expr s) then muldiv_expr s
-            else term s
-        
-------------------------------------------------------------
-muldiv_expr s = let (v1, s1, r1) = term s
-                    (v2, s2, r2) = term2 (drop 1 s1)
-                in if r1 && r2 
-                        then case head s1 of
-                                '*' -> (v1*v2, s2, True)
-                                '/' -> (v1/v2, s2, True)
-                                otherwise -> failParse s1
-                        else if r1 then failParse s2 else failParse s1
-                        
-------------------------------------------------------------               
-addsub_expr s = let (v1, s1, r1) = term2 s
-                    (v2, s2, r2) = expr (drop 1 s1)
-                in if r1 && r2
-                        then case head s1 of
-                                '+' -> (v1 + v2, s2, True)
-                                '-' -> (v1 - v2, s2, True)
-                                otherwise -> failParse s1
-                        else if r1 then failParse s2 else failParse s1
-                        
-------------------------------------------------------------
-find_table_element s table df = let sl = map (\x -> (x, check_str (fst x) s)) table
-                                    found = filter (fst.snd) sl
-                                        in case found of
-                                        [] -> (df, [], False)
-                                        otherwise -> ((snd.fst.head) found, (snd.snd.head) found, True)
-                                        
-------------------------------------------------------------
-const_p s = find_table_element s constants 0.0
-                                        
-------------------------------------------------------------
-get_unary_func s = find_table_element s unary_functions (\_->0)
-get_binary_func s = find_table_element s binary_functions (\_ _->0)
-                                                                                        
-------------------------------------------------------------                                                   
-unary_func s = let (f, s1, r) = get_unary_func s
-                   (var, s2, r2) = expr (drop 1 s1) 
-                in if r && r2 && head s1 == '(' && head s2 == ')' 
-                        then (f(var), drop 1 s2, True)
-                        else failParse s1
-                
-                
-binary_func s = let (f, s1, r) = get_binary_func s
-                    (var1, s2, r2) = expr (drop 1 s1)
-                    (var2, s3, r3) = expr (drop 1 s2) 
-                in if r && r2 && r3 && head s1 == '(' && head s2 == ',' && head s3 == ')' 
-                        then (f var1 var2, drop 1 s3, True)
-                        else failParse s1
+is_operator char      = any (==char) operator
+is_number char        = any (==char) number
+is_open_bracket char  = any (==char) open_brackets
+is_close_bracket char = any (==char) close_brackets
+
+-- Get the hole content of the bracket.
+parse_bracket expression = (remove_brackets content, rest)
+                           where content = bracket_content expression 0
+                                 rest = drop (length content) expression
+
+bracket_content [] 0 = []
+bracket_content (first:rest) counter 
+    | is_open_bracket first  = first : bracket_content rest (counter + 1)
+    | is_close_bracket first = first : bracket_content rest (counter - 1)
+    | counter == 0 = []
+    | otherwise = first : bracket_content rest counter
+bracket_content _ _ = error "No closing bracket!"
+
+-- Takes a string and removes the brackets around it.
+remove_brackets s = tail $ init s
+
+-- Conversion functions
+to_operator "+" = Operator Plus
+to_operator "-" = Operator Minus
+to_operator "*" = Operator Times
+to_operator "/" = Operator Over
+to_operator  s  = error $ "Unknown operator: " ++ s
+to_number s = Operand (read s)
+to_sublist s = SubList $ parse s
+
+-----------------------------------------------------------------------------------------------------------------
+-- Regrouping the parsed list
+-----------------------------------------------------------------------------------------------------------------
+-- The algorithm used evaluate the syntax list is fairly naive and knows nothing about things
+-- like operator precedence. 
+restructure list = group_by_precedence $ resolve_prefix_minus list
+
+
+
+resolve_prefix_minus (a:(Operator Minus):xs) =  resolve_prefix_minus $ a : (Operator Plus)  : (Operand (-1)) : (Operator Times) : xs
+resolve_prefix_minus ((Operator Minus):xs) =  (Operand (-1)) : (Operator Times) : resolve_prefix_minus xs
+resolve_prefix_minus ((SubList l):xs) =  (SubList $ resolve_prefix_minus l) : resolve_prefix_minus xs
+resolve_prefix_minus (x:xs) =  x : resolve_prefix_minus xs
+resolve_prefix_minus [] = []
+
+
+
+
+group_by_precedence list = group_by_operators (\o -> o == Times || o == Over) list
+
+group_by_operators :: (Num a, Fractional a) => (Operators -> Bool) -> [SyntacticalElement a] -> [SyntacticalElement a]
+group_by_operators _ [] = []
+group_by_operators f [SubList [a, o, b]] = [SubList $ (group_by_operators f [a]) ++ [o] ++ (group_by_operators f [b])]
+group_by_operators f (a:(Operator o):b:rest)
+    | f o = group_by_operators f $ (SubList [a, Operator o, b]) : group_by_operators f rest
+group_by_operators f ((SubList a):rest) = (SubList $ group_by_operators f a) : group_by_operators f rest
+group_by_operators f (a:rest) = a : group_by_operators f rest
+
+-----------------------------------------------------------------------------------------------------------------
+-- Evaluation
+-----------------------------------------------------------------------------------------------------------------
+-- Simple as can be. Just run through the list and evaluate everything you see.
+evaluate :: (Num a, Fractional a) => [SyntacticalElement a] -> a
+evaluate (a:(Operator o):rest)
+    | o == Plus  = (c + d)
+    | o == Minus = (c - d)
+    | o == Times = (c * d)
+    | o == Over  = (c / d)
+    where c = evaluate [a]
+          d = evaluate rest
+evaluate [(Operand n)] = n
+evaluate [(SubList l)] = evaluate l
+evaluate _ = error "Evaluation failed!"
