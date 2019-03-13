@@ -5,7 +5,7 @@ module Calculator where
 
 
 calculator :: (Read a, Num a, Fractional a) => String -> a
-calculator expression = evaluate $ restructure $ parse $ clean expression
+calculator expression = evaluate $ restructure $ parse expression
 
 
 
