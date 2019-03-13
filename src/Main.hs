@@ -19,7 +19,7 @@ parseArgs y@(x:_)   = do
          
 calculating :: IO()
 calculating = do
-    putStrLn $ "Введите выражение для подсчёта без знака =, например: 2+2"
+    putStrLn $ "Введите выражение для подсчёта, например: 2+2,  2-4*3+2"
     str <- getLine
     putStr str
     putStr "="
@@ -37,4 +37,4 @@ version :: IO()
 version = putStrLn versionStr
 
 versionStr :: String
-versionStr =    "Calculator, version 1.1."
+versionStr =    "Calculator, version 1.2."
