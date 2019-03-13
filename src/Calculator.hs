@@ -30,7 +30,7 @@ close_brackets = [')', ']']
 brackets = open_brackets ++ close_brackets
 allowed_chars = number ++ operator ++ brackets
 
---remove illegal characters
+
 clean expression = filter (\c -> any (==c) allowed_chars) expression
 
 
@@ -41,7 +41,7 @@ parse expression = element : (parse rest)
                    where (element, rest) = get_next_element expression
 
 
--- Just get the first syntactical element from the expression.
+                   
 get_next_element :: (Read a, Num a, Fractional a) => String -> (SyntacticalElement a, String)
 get_next_element s@(first:_)
     | is_open_bracket first  = (to_sublist content, rest_b)
@@ -58,7 +58,7 @@ is_number char        = any (==char) number
 is_open_bracket char  = any (==char) open_brackets
 is_close_bracket char = any (==char) close_brackets
 
--- Get the hole content of the bracket.
+
 parse_bracket expression = (remove_brackets content, rest)
                            where content = bracket_content expression 0
                                  rest = drop (length content) expression
@@ -71,10 +71,10 @@ bracket_content (first:rest) counter
     | otherwise = first : bracket_content rest counter
 bracket_content _ _ = error "No closing bracket!"
 
--- Takes a string and removes the brackets around it.
+
 remove_brackets s = tail $ init s
 
--- Conversion functions
+
 to_operator "+" = Operator Plus
 to_operator "-" = Operator Minus
 to_operator "*" = Operator Times
@@ -83,11 +83,7 @@ to_operator  s  = error $ "Unknown operator: " ++ s
 to_number s = Operand (read s)
 to_sublist s = SubList $ parse s
 
------------------------------------------------------------------------------------------------------------------
--- Regrouping the parsed list
------------------------------------------------------------------------------------------------------------------
--- The algorithm used evaluate the syntax list is fairly naive and knows nothing about things
--- like operator precedence. 
+
 restructure list = group_by_precedence $ resolve_prefix_minus list
 
 
@@ -111,10 +107,9 @@ group_by_operators f (a:(Operator o):b:rest)
 group_by_operators f ((SubList a):rest) = (SubList $ group_by_operators f a) : group_by_operators f rest
 group_by_operators f (a:rest) = a : group_by_operators f rest
 
------------------------------------------------------------------------------------------------------------------
--- Evaluation
------------------------------------------------------------------------------------------------------------------
--- Simple as can be. Just run through the list and evaluate everything you see.
+
+
+
 evaluate :: (Num a, Fractional a) => [SyntacticalElement a] -> a
 evaluate (a:(Operator o):rest)
     | o == Plus  = (c + d)
